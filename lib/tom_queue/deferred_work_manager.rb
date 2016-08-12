@@ -32,7 +32,6 @@ module TomQueue
       setup_amqp
       @deferred_set = DeferredWorkSet.new
       @out_manager = QueueManager.new(prefix)
-      @shutdown = false
     end
 
 
@@ -81,25 +80,25 @@ module TomQueue
       debug "[DeferredWorkManager] Deferred process starting up"
 
       # This block will get called-back for new messages
-      @consumer = queue.subscribe(:ack => true, &method(:schedule))
+      @consumer = queue.subscribe(:manual_ack => true, &method(:schedule))
 
       # This is the core event loop - we block on the deferred set to return messages
       # (which have been scheduled by the AMQP consumer). If a message is returned
       # then we re-publish the messages to our internal QueueManager and ack the deferred
       # message
-      until @shutdown
+      loop do
         # This will block until work is ready to be returned, interrupt
         # or the 10-second timeout value.
         response, headers, payload = deferred_set.pop(2)
-        puts "[DeferredWorkManager] Popped a message with run_at: #{headers && headers[:headers]['run_at']}"
 
         if response
+          debug "[DeferredWorkManager] Popped a message with run_at: #{headers && headers[:headers]['run_at']}"
           headers[:headers].delete('run_at')
           out_manager.publish(payload, headers[:headers])
           channel.ack(response.delivery_tag)
         end
       end
-
+    rescue SignalException
       consumer.cancel
       channel && channel.close
     rescue Exception => e
@@ -107,12 +106,5 @@ module TomQueue
       reporter = TomQueue.exception_reporter
       reporter && reporter.notify($!)
     end
-
-    def stop
-      @shutdown = true
-      deferred_set && deferred_set.interrupt
-    end
-
   end
-
 end

@@ -166,7 +166,7 @@ module TomQueue
 
     def publish_immediate(work, run_at, priority)
       debug "[publish] Pushing work onto exchange '#{@exchange.name}' with routing key '#{priority}'"
-      @publisher_channel.topic(@exchange.name, :passive=>true).publish(work, {
+      @exchange.publish(work, {
           :routing_key => priority,
           :headers => {
             :job_priority => priority,
@@ -227,7 +227,7 @@ module TomQueue
         debug "[pop] Popping '#{@queues[priority].name}'..."
         # Perform a basic get. Calling Queue#get gets into a mess wrt the subscribe
         # below. Don't do it.
-        response, headers, payload = @channel.basic_get(@queues[priority].name, :ack => true)
+        response, headers, payload = @channel.basic_get(@queues[priority].name, :manual_ack => true)
 
         # Array#find will break out of the loop if we return a non-nil value.
         payload
@@ -249,7 +249,7 @@ module TomQueue
       # Setup a subscription to all the queues. The channel pre-fetch
       # will ensure we get exactly one message delivered
       consumers = PRIORITIES.map do |priority|
-        @queues[priority].subscribe(:ack => true) do |*args|
+        @queues[priority].subscribe(:manual_ack => true) do |*args|
           @mutex.synchronize do
             consumer_thread_value = args
             @condvar.signal

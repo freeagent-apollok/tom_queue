@@ -256,12 +256,6 @@ module TomQueue
             job
 
           end
-        rescue => e
-          if e.class.to_s =~ /^RSpec/
-            raise
-          else
-            record.logger.error(e) if record.respond_to?(:logger) && record.logger
-          end
         end
       end
 
@@ -365,16 +359,6 @@ module TomQueue
       #
       # Returns nil or TomQueue::Work object
       attr_accessor :tomqueue_work
-
-      # Internal: This wraps the job invocation with an acknowledgement of the original
-      # TomQueue work object, if one is around.
-      #
-      def invoke_job
-        super
-      ensure
-        debug "[invoke job:#{self.id}] Invoke completed, acking message."
-        self.tomqueue_work && self.tomqueue_work.ack!
-      end
 
     end
   end
